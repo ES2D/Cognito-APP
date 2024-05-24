@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CognitoUserAttribute } from 'amazon-cognito-identity-js';
+import { CognitoUserAttribute, CognitoUser } from 'amazon-cognito-identity-js';
 import { userPool } from '../services/awsConfig';
 
 const Formulario: React.FC = () => {
@@ -8,36 +8,33 @@ const Formulario: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!email || !password) {
-      setErrorMessage('Todos los campos son obligatorios');
-      return;
-    }
+
     if (!validateEmail(email)) {
       setErrorMessage('Por favor ingrese un correo electrónico válido');
       return;
     }
-    setErrorMessage('');
 
-    const attributeList = [];
-    const dataEmail = {
-      Name: 'email',
-      Value: email,
-    };
-    const attributeEmail = new CognitoUserAttribute(dataEmail);
-    attributeList.push(attributeEmail);
+    try {
+      const attributeList: CognitoUserAttribute[] = [];
+      attributeList.push(new CognitoUserAttribute({ Name: 'email', Value: email }));
 
-    userPool.signUp(email, password, attributeList, [], (err, result) => {
-      if (err) {
-        setErrorMessage(err.message || JSON.stringify(err));
-        return;
-      }
-      if (result) {
-        setSuccessMessage('Usuario registrado con éxito');
-        console.log('Usuario registrado:', result.user.getUsername());
-      }
-    });
+      await new Promise<void>((resolve, reject) => {
+        userPool.signUp(email, password, attributeList, [], (err, result) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          const user = result?.user as CognitoUser;
+          setSuccessMessage('Usuario registrado con éxito. Por favor, verifica tu correo electrónico.');
+          console.log('Usuario registrado:', user.getUsername());
+          resolve();
+        });
+      });
+    } catch (error) {
+      setErrorMessage((error as Error).message || 'Hubo un error al registrar el usuario.');
+    }
   };
 
   const validateEmail = (email: string) => {
@@ -52,7 +49,7 @@ const Formulario: React.FC = () => {
           <h5 className="card-title">Registrarse</h5>
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label htmlFor="email" className="form-label">Email address</label>
+              <label htmlFor="email" className="form-label">Correo Electrónico</label>
               <input
                 type="email"
                 className="form-control"
@@ -60,21 +57,23 @@ const Formulario: React.FC = () => {
                 aria-describedby="emailHelp"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
               />
             </div>
             <div className="mb-3">
-              <label htmlFor="password" className="form-label">Password</label>
+              <label htmlFor="password" className="form-label">Contraseña</label>
               <input
                 type="password"
                 className="form-control"
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
               />
             </div>
             {errorMessage && <div className="alert alert-danger">{errorMessage}</div>}
             {successMessage && <div className="alert alert-success">{successMessage}</div>}
-            <button type="submit" className="btn btn-primary w-100">Submit</button>
+            <button type="submit" className="btn btn-primary w-100">Registrarse</button>
           </form>
         </div>
       </div>
